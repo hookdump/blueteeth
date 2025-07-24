@@ -1,8 +1,13 @@
 <p align="center">
-  <img alt="header" src="https://github.com/user-attachments/assets/5c47df6e-a3b6-499a-ad76-03888baba138" />
+  <img alt="header" src="https://github.com/user-attachments/assets/5c47df6e-a3b6-499a-ad76-03888baba138" width="500" />
 </p>
 
-**Blueteeth** is a robust CLI tool for managing Bluetooth audio devices on Linux with PipeWire.
+**Blueteeth** is a robust CLI tool for managing Bluetooth audio devices on **Linux** with **PipeWire**.
+
+<p align="center">
+  <img width="300" height="300" alt="pipewire_small" src="https://github.com/user-attachments/assets/aa329152-ca24-4690-9883-06e1d35296b1" />
+</p>
+
 
 ## Problem
 Managing Bluetooth headphones on Linux without a full desktop environment is painful:
