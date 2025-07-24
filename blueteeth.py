@@ -258,17 +258,22 @@ class PipeWireManager:
                     continue
                 elif 'Sources:' in line:
                     in_sinks = False
-                elif in_sinks and line:
-                    # Parse sink line
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        sink_id = parts[0].strip('*.')
-                        sink_name = ' '.join(parts[1:])
-                        sinks.append({
-                            'id': sink_id,
-                            'name': sink_name,
-                            'default': line.startswith('*')
-                        })
+                elif in_sinks and line.strip():
+                    # Parse sink line - format can include tree characters like "│  *   32. Samsung Monitor HDMI [vol: 0.75]"
+                    # Strip tree characters and parse
+                    clean_line = line.replace('│', '').replace('├', '').replace('└', '').strip()
+                    if clean_line:
+                        # Look for pattern like "* 32. Samsung Monitor HDMI [vol: 0.75]"
+                        match = re.match(r'^(\*)?\s*(\d+)\.\s+(.+?)(?:\s+\[.*\])?$', clean_line)
+                        if match:
+                            is_default = bool(match.group(1))
+                            sink_id = match.group(2)
+                            sink_name = match.group(3).strip()
+                            sinks.append({
+                                'id': sink_id,
+                                'name': sink_name,
+                                'default': is_default
+                            })
             return sinks
         except subprocess.CalledProcessError:
             return []
@@ -749,6 +754,85 @@ class Blueteeth:
                 click.echo("\nNo device to reconnect. Run 'blueteeth connect' when ready.")
         
         return False
+    
+    def switch_sink(self, sink_id: Optional[str] = None):
+        """Switch audio output to a different sink"""
+        sinks = self.pw.get_sinks()
+        
+        if not sinks:
+            click.echo("No audio sinks found.")
+            return False
+        
+        # Filter out Bluetooth sinks for non-Bluetooth options
+        non_bt_sinks = [s for s in sinks if 'bluetooth' not in s['name'].lower() and 'bluez' not in s['name'].lower()]
+        
+        if not sink_id:
+            # Show available sinks
+            click.echo("Available audio outputs:\n")
+            click.echo("Bluetooth sinks:")
+            bt_sinks = [s for s in sinks if 'bluetooth' in s['name'].lower() or 'bluez' in s['name'].lower()]
+            if bt_sinks:
+                for sink in bt_sinks:
+                    default_marker = " * (current)" if sink['default'] else ""
+                    click.echo(f"  {sink['id']}. {sink['name']}{default_marker}")
+            else:
+                click.echo("  None")
+            
+            click.echo("\nOther audio outputs:")
+            if non_bt_sinks:
+                for sink in non_bt_sinks:
+                    default_marker = " * (current)" if sink['default'] else ""
+                    click.echo(f"  {sink['id']}. {sink['name']}{default_marker}")
+            else:
+                click.echo("  None")
+            
+            if not non_bt_sinks and not bt_sinks:
+                return False
+            
+            # Prompt for selection
+            while True:
+                choice = click.prompt("\nSelect sink ID number (or 'c' to cancel)", type=str)
+                if choice.lower() == 'c':
+                    click.echo("Cancelled.")
+                    return False
+                
+                # Check if valid sink ID
+                for sink in sinks:
+                    if sink['id'] == choice:
+                        sink_id = choice
+                        break
+                
+                if sink_id:
+                    break
+                else:
+                    click.echo("Invalid sink ID. Please try again.")
+        
+        # Find the selected sink
+        selected_sink = None
+        for sink in sinks:
+            if sink['id'] == sink_id:
+                selected_sink = sink
+                break
+        
+        if not selected_sink:
+            click.echo(f"Sink ID {sink_id} not found.")
+            return False
+        
+        # Switch to the selected sink
+        click.echo(f"\nSwitching audio output to: {selected_sink['name']}")
+        if self.pw.set_default_sink(sink_id):
+            click.echo(f"✓ Audio output switched successfully")
+            
+            # Show tip if switching away from Bluetooth
+            if any(kw in selected_sink['name'].lower() for kw in ['bluetooth', 'bluez']):
+                click.echo("\nTip: To switch back to regular audio, run 'blueteeth switch' again")
+            else:
+                click.echo("\nTip: To reconnect Bluetooth audio, run 'blueteeth connect'")
+            
+            return True
+        else:
+            click.echo("✗ Failed to switch audio output")
+            return False
 
 
 @click.group()
@@ -814,6 +898,14 @@ def remove(device):
     """Remove a paired device"""
     app = Blueteeth()
     sys.exit(0 if app.remove_device_interactive(device) else 1)
+
+
+@cli.command()
+@click.argument('sink_id', required=False)
+def switch(sink_id):
+    """Switch audio output to a different sink (away from Bluetooth)"""
+    app = Blueteeth()
+    sys.exit(0 if app.switch_sink(sink_id) else 1)
 
 
 if __name__ == '__main__':
