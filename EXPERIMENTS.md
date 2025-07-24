@@ -32,6 +32,10 @@ Commands to explore:
 Session manager for PipeWire.
 - `wpctl status` - Show devices and streams
 - `wpctl set-default <id>` - Set default sink
+- `wpctl list-devices` - List all devices with IDs
+- `wpctl inspect <id>` - Detailed device info
+
+Tested: wpctl is available and shows current audio devices
 
 ## Audio Profile Management
 
